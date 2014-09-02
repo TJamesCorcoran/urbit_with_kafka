@@ -10,8 +10,17 @@
 
       typedef struct _u2_cart {
         u2_noun vir;                      //  effects of ovum
-        u2_bean did;                      //  cart considered for commit?
-        u2_bean cit;                      //  cart committed?
+
+		// NOTE: tasks associated with 'pre' and 'done' are done in
+		//       seperate threads.  Completion order is unspecified,
+		//       but once BOTH are done we can proceed to emitting
+		//       side effects, updating state.  See raft.c foobar()
+		//       and foobar_completion() for details, mutex, etc.
+		//
+        u2_bean log;                      //  message successfully logged?
+        u2_bean done;                     //  arvo processing done?
+        u2_bean emit;                     //  ?
+
         c3_d    ent_d;                    //  entry in raft queue?
         void (*clr_f)                     //  ovum processing failed
             (struct _u2_reck *rec_u,      //  system
@@ -27,6 +36,7 @@
         c3_w    kno_w;                    //  kernel stage
         c3_w    rno_w;                    //  rotor index (always 0)
         c3_d    ent_d;                    //  event counter
+        c3_d    kaf_d;                    //  kafka number (loaded from checkpt at boot, then incrementing)
 
         u2_noun yot;                      //  new toy system
         u2_noun now;                      //  current time, as noun

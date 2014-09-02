@@ -2,6 +2,9 @@
 **
 ** This file is in the public domain.
 */
+
+#include "rdkafka.h"  /* for Kafka driver */
+
   /** Quasi-tunable parameters.
   **/
     /* First kernel this executable can boot.
@@ -214,7 +217,10 @@
       typedef struct _u2_save {
         uv_timer_t  tim_u;                  //  checkpoint timer
         uv_signal_t sil_u;                  //  child signal
-        c3_d        ent_d;                  //  event number
+
+        c3_d        ent_d;                  //  event number (loaded from checkpt at boot, then incrementing)
+        c3_d        kaf_d;                  //  kafka number (loaded from checkpt at boot, then incrementing)
+
         c3_w        pid_w;                  //  pid of checkpoint process
       } u2_save;
 
@@ -251,44 +257,6 @@
           c3_w wid_w;                       //  total width
         } fut;
       } u2_utat;
-
-    /* u2_uled: event log header.
-    */
-      typedef struct {
-        c3_l mag_l;                         //  mug of log format, 'a', 'b'...
-        c3_w kno_w;                         //  kernel number validated with
-        c3_l sal_l;                         //  salt for passcode
-        c3_l key_l;                         //  mug of crypto key, or 0
-        c3_l sev_l;                         //  host process identity
-        c3_l tno_l;                         //  terminal count in host
-      } u2_uled;
-
-    /* u2_olar: event log trailer, old version.
-    */
-      typedef struct {
-        c3_w syn_w;                         //  must equal mug of address
-        c3_w ent_w;                         //  event sequence number
-        c3_w len_w;                         //  word length of this event
-        c3_w mug_w;                         //  mug of entry
-      } u2_olar;
-
-    /* u2_ular: event log trailer.
-    */
-      typedef struct {
-        c3_w syn_w;                         //  must equal mug of address
-        c3_d ent_d;                         //  event sequence number
-        c3_w len_w;                         //  word length of this event
-        c3_w mug_w;                         //  mug of entry
-        c3_w tem_w;                         //  raft term of event
-        c3_w typ_w;                         //  type of event, %ra|%ov
-      } u2_ular;
-
-    /* u2_ulog: unix event log.
-    */
-      typedef struct {
-        c3_i fid_i;                         //  file descriptor
-        c3_d len_d;                         //  length in words
-      } u2_ulog;
 
       struct _u2_uhot;
       struct _u2_udir;
@@ -449,12 +417,42 @@
         u2_raty_lead
       } u2_raty;
 
+    /* u2_ulog: egzh log.
+    */
+      typedef struct {
+        c3_i w_fid_i;                       //  write descriptor
+        c3_i r_fid_i;                       //  read  file descriptor
+
+        c3_d len_d;                         //  length in words
+		uv_thread_t egz_consolidator_thread_u;  // Consolidator runs in thread. This is handle.
+
+      } u2_ulog;
+
+
+    /* u2_kafk: kafka log
+    */
+      typedef struct _u2_kafk {
+		c3_t                   inited_t;
+		rd_kafka_t *           kafka_prod_handle_u;
+		rd_kafka_t *           kafka_cons_handle_u;
+
+		rd_kafka_topic_t *     topic_prod_handle_u;
+		rd_kafka_topic_t *     topic_cons_handle_u;
+
+		// not our sequence number; kafka's sequence number
+		c3_ds                  largest_offset_seen_ds;         // largest overall
+		c3_ds                  largest_offset_seen_precom_ds;  // largest precommit msg id (for testing, mostly)
+
+      } u2_kafk;
+
+
     /* u2_raft: raft state.
     */
       typedef struct {
         uv_tcp_t         wax_u;             //  TCP listener
         uv_timer_t       tim_u;             //  election/heartbeat timer
-        u2_ulog          lug_u;             //  event log
+        u2_ulog          lug_u;             //  egz
+                                            //     FIXME: it would be nice to move the global kafk in here!!!
         c3_d             ent_d;             //  last log index
         c3_w             lat_w;             //  last log term
         u2_raty          typ_e;             //  server type
@@ -514,7 +512,9 @@
     /* u2_opts: command line configuration.
     */
       typedef struct _u2_opts {
+        c3_c*   adm_c;                      //  -A, admin subcommand
         c3_c*   imp_c;                      //  -I, czar name
+        c3_c*   kaf_c;                      //  -K, kafka hosts 
         c3_c*   nam_c;                      //  -n, unix hostname
         c3_c*   raf_c;                      //  -r, raft flotilla
         c3_w    kno_w;                      //  -k, kernel version
@@ -560,9 +560,6 @@
         u2_reck*   arv_u;                   //  runtime
       } u2_host;                            //  host == computer == process
 
-#     define u2L  u2_Host.lup_u             //  global event loop
-#     define u2R  (&(u2_Raft))
-#     define u2S  u2_Host.ssl_u
 
     /* u2_funk: standard system function.
     */
@@ -573,6 +570,7 @@
     c3_global  u2_host  u2_Host;
     c3_global  u2_wire  u2_Wire;
     c3_global  u2_raft  u2_Raft;
+    c3_global  u2_kafk  u2_Kafk;
     c3_global  c3_c*    u2_Local;
     c3_global  c3_c*    u2_System;
 
@@ -580,6 +578,11 @@
     c3_global  u2_bean  u2_Flag_Garbage;
     c3_global  u2_bean  u2_Flag_Profile;
     c3_global  u2_bean  u2_Flag_Verbose;
+
+#     define u2L  u2_Host.lup_u             //  global event loop
+#     define u2R  (&(u2_Raft))
+#     define u2S  u2_Host.ssl_u
+#     define u2K  (&(u2_Kafk))
 
   /** Functions.
   **/
@@ -1155,71 +1158,6 @@
         void
         u2_raft_work(u2_reck* rec_u);
 
-    /**  Disk persistence.
-    **/
-      /* u2_sist_boot(): restore or create pier from disk.
-      */
-        void
-        u2_sist_boot(void);
-
-      /* u2_sist_pack(): write a log entry to disk.
-      **
-      ** XX Synchronous.
-      **
-      ** typ_w is a mote describing the entry type: %ov for Arvo
-      ** logs, %ra for Raft events.
-      **
-      ** Returns the entry's sequence number.
-      */
-        c3_d
-        u2_sist_pack(u2_reck* rec_u,
-                     c3_w tem_w,
-                     c3_w typ_w,
-                     c3_w* bob_w,
-                     c3_w len_w);
-
-      /* u2_sist_put(): moronic key-value store put.
-      **
-      ** u2_sist_put will do its best to associate the passed key with
-      ** the passed value in a way that will persist across process
-      ** restarts. It will probably do so by writing a file named for
-      ** the key with contents identical to the value. To rely on it
-      ** for anything heavy-duty would be a mistake.
-      **
-      ** Why would we even have something like this? Because sometimes
-      ** we need to maintain files completely independently of the
-      ** noun state.
-      */
-        void
-        u2_sist_put(const c3_c* key_c, const c3_y* val_y, size_t siz_i);
-
-      /* u2_sist_nil(): moronic key-value store rm.
-      **
-      ** Does its best to expunge all records on the given key. Has
-      ** no effect if the key doesn't exist.
-      */
-        void
-        u2_sist_nil(const c3_c* key_c);
-
-      /* u2_sist_has(): moronic key-value store existence check.
-      **
-      ** Returns the byte length of the value previously stored via
-      ** u2_sist_put, or -1 if it couldn't find one.
-      */
-        ssize_t
-        u2_sist_has(const c3_c* key_c);
-
-      /* u2_sist_get(): moronic key-value store get.
-      **
-      ** u2_sist_get is the mirror of u2_sist_put. It writes to val_y,
-      ** which had better be at least as big as the return value from
-      ** u2_sist_has, the value that you previously put.
-      **
-      ** Needless to say, u2_sist_get crashes if it can't find your
-      ** value.
-      */
-        void
-        u2_sist_get(const c3_c* key_c, c3_y* val_y);
 
 
     /**  HTTP client.

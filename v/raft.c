@@ -10,6 +10,9 @@
 
 #include "all.h"
 #include "v/vere.h"
+#include "v/sist.h"
+#include "v/egzh.h"
+#include "v/kafk.h"
 
 
 /* u2_rent: Log entry wire format.
@@ -57,6 +60,7 @@ static u2_bean _raft_remove_run(u2_rcon* ron_u);
 static void _raft_send_rasp(u2_rcon* ron_u, c3_t suc_t);
 static void _raft_rreq_free(u2_rreq* req_u);
 static void _raft_time_cb(uv_timer_t* tim_u, c3_i sas_i);
+static void _raft_sure_guard(u2_reck* rec_u, u2_noun ovo, u2_noun vir, u2_noun cor, c3_t force_delay);
 
 static void
 _raft_rnam_free(u2_rnam* nam_u)
@@ -448,7 +452,7 @@ _raft_rmsg_read(const u2_rbuf* buf_u, u2_rmsg* msg_u)
   red_i += sizeof(c3_d);
 
   if ( msg_u->len_d < 4 ) {
-    uL(fprintf(uH, "raft: length too short (a) %llu\n", msg_u->len_d));
+    uL(fprintf(uH, "raft: length too short (a) %llu\n", ( unsigned long long int) msg_u->len_d));
     return -1;
   }
 
@@ -459,7 +463,7 @@ _raft_rmsg_read(const u2_rbuf* buf_u, u2_rmsg* msg_u)
   }
 
   if ( ben_d < red_i + 2 * sizeof(c3_w) ) {
-    uL(fprintf(uH, "raft: length too short (b) %llu\n", msg_u->len_d));
+    uL(fprintf(uH, "raft: length too short (b) %llu\n", (unsigned long long int) msg_u->len_d));
     return -1;
   }
   memcpy(&msg_u->tem_w, buf_u->buf_y + red_i, sizeof(c3_w));
@@ -474,7 +478,7 @@ _raft_rmsg_read(const u2_rbuf* buf_u, u2_rmsg* msg_u)
     }
     case c3__rasp: {
       if ( ben_d < red_i + sizeof(c3_w) ) {
-        uL(fprintf(uH, "raft: length too short (c) %llu\n", msg_u->len_d));
+        uL(fprintf(uH, "raft: length too short (c) %llu\n", ( unsigned long long int)msg_u->len_d));
         return -1;
       }
       memcpy(&msg_u->rasp.suc_w, buf_u->buf_y + red_i, sizeof(c3_w));
@@ -483,7 +487,7 @@ _raft_rmsg_read(const u2_rbuf* buf_u, u2_rmsg* msg_u)
     }
     case c3__apen: case c3__revo: {
       if ( ben_d < red_i + sizeof(c3_d) + 2 * sizeof(c3_w) ) {
-        uL(fprintf(uH, "raft: length too short (d) %llu\n", msg_u->len_d));
+        uL(fprintf(uH, "raft: length too short (d) %llu\n", ( unsigned long long int)msg_u->len_d));
         return -1;
       }
       memcpy(&msg_u->rest.lai_d, buf_u->buf_y + red_i, sizeof(c3_d));
@@ -494,7 +498,7 @@ _raft_rmsg_read(const u2_rbuf* buf_u, u2_rmsg* msg_u)
       red_i += sizeof(c3_w);
 
       if ( ben_d < red_i + 4 * msg_u->rest.nam_w ) {
-        uL(fprintf(uH, "raft: length too short (e) %llu\n", msg_u->len_d));
+        uL(fprintf(uH, "raft: length too short (e) %llu\n", ( unsigned long long int)msg_u->len_d));
         return -1;
       }
       msg_u->rest.nam_c = c3_malloc(4 * msg_u->rest.nam_w);
@@ -507,7 +511,7 @@ _raft_rmsg_read(const u2_rbuf* buf_u, u2_rmsg* msg_u)
 
   if ( c3__apen == msg_u->typ_w ) {
     if ( ben_d < red_i + 2 * sizeof(c3_d) ) {
-      uL(fprintf(uH, "raft: length too short (f) %llu\n", msg_u->len_d));
+      uL(fprintf(uH, "raft: length too short (f) %llu\n", ( unsigned long long int)msg_u->len_d));
       red_i = -1;
       goto fail;
     }
@@ -524,7 +528,7 @@ _raft_rmsg_read(const u2_rbuf* buf_u, u2_rmsg* msg_u)
 
       for ( i_d = 0; i_d < msg_u->rest.apen.ent_d; i_d++ ) {
         if ( ben_d < red_i + 3 * sizeof(c3_w) ) {
-          uL(fprintf(uH, "raft: length too short (g) %llu\n", msg_u->len_d));
+          uL(fprintf(uH, "raft: length too short (g) %llu\n", ( unsigned long long int)msg_u->len_d));
           red_i = -1;
           goto fail;
         }
@@ -535,7 +539,7 @@ _raft_rmsg_read(const u2_rbuf* buf_u, u2_rmsg* msg_u)
         memcpy(&ent_u[i_d].len_w, buf_u->buf_y + red_i, sizeof(c3_w));
         red_i += sizeof(c3_w);
         if ( ben_d < red_i + 4 * ent_u[i_d].len_w ) {
-          uL(fprintf(uH, "raft: length too short (h) %llu\n", msg_u->len_d));
+          uL(fprintf(uH, "raft: length too short (h) %llu\n", ( unsigned long long int)msg_u->len_d));
           red_i = -1;
           goto fail;
         }
@@ -547,7 +551,7 @@ _raft_rmsg_read(const u2_rbuf* buf_u, u2_rmsg* msg_u)
   }
 
   if ( red_i != ben_d ) {
-    uL(fprintf(uH, "raft: sizes don't match r:%ld w:%llu\n", red_i, ben_d));
+    uL(fprintf(uH, "raft: sizes don't match r:%ld w:%llu\n", (long int) red_i, ( unsigned long long int)ben_d));
     red_i = -1;
     goto fail;
   }
@@ -1452,14 +1456,24 @@ _raft_sure(u2_reck* rec_u, u2_noun ovo, u2_noun vir, u2_noun cor)
     u2_mug(cor);
     u2_mug(rec_u->roc);
 
+    // we've got a new candidate world state.  Perhaps it's identical
+    // to where we are now. Perhaps its new.
+    //
+    // * if new: update world state
+    // * in either case: push side effects event into queue
+    //
     if ( u2_no == u2_sing(cor, rec_u->roc) ) {
       rec_u->roe = u2nc(u2nc(vir, ovo), rec_u->roe);
 
       u2z(rec_u->roc);
+
+      // update universe
       rec_u->roc = cor;
     }
     else {
       u2z(ovo);
+
+      // push a new event into queue
       rec_u->roe = u2nc(u2nc(vir, u2_nul), rec_u->roe);
 
       u2z(cor);
@@ -1505,7 +1519,7 @@ _raft_lame(u2_reck* rec_u, u2_noun ovo, u2_noun why, u2_noun tan)
 
   gon = u2_lo_soft(rec_u, 0, u2_reck_poke, u2k(bov));
   if ( u2_blip == u2h(gon) ) {
-    _raft_sure(rec_u, bov, u2k(u2h(u2t(gon))), u2k(u2t(u2t(gon))));
+    _raft_sure_guard(rec_u, bov, u2k(u2h(u2t(gon))), u2k(u2t(u2t(gon))), c3_false);
 
     u2z(gon);
   }
@@ -1517,7 +1531,7 @@ _raft_lame(u2_reck* rec_u, u2_noun ovo, u2_noun why, u2_noun tan)
       u2_noun nog = u2_lo_soft(rec_u, 0, u2_reck_poke, u2k(vab));
 
       if ( u2_blip == u2h(nog) ) {
-        _raft_sure(rec_u, vab, u2k(u2h(u2t(nog))), u2k(u2t(u2t(nog))));
+        _raft_sure_guard(rec_u, vab, u2k(u2h(u2t(nog))), u2k(u2t(u2t(nog))), c3_false);
         u2z(nog);
       }
       else {
@@ -1565,8 +1579,11 @@ _raft_punk(u2_reck* rec_u, u2_noun ovo)
   uL(fprintf(uH, "%%soft %s\n", txt_c));
 #endif
 
-  gon = u2_lo_soft(rec_u, sec_w, u2_reck_poke, u2k(ovo));
+  // TJIC: this is what calls into arvo proper
+  // does NOT modify global arvo state.  gon is a list of ova which are
+  // EFFECTS ** AND ** the new kernel state
 
+  gon = u2_lo_soft(rec_u, sec_w, u2_reck_poke, u2k(ovo));  
 #ifdef GHETTO
   c3_w ms_w;
 
@@ -1577,6 +1594,7 @@ _raft_punk(u2_reck* rec_u, u2_noun ovo)
   free(txt_c);
 #endif
 
+  // error case
   if ( u2_blip != u2h(gon) ) {
     u2_noun why = u2k(u2h(gon));
     u2_noun tan = u2k(u2t(gon));
@@ -1584,27 +1602,28 @@ _raft_punk(u2_reck* rec_u, u2_noun ovo)
     u2z(gon);
     _raft_lame(rec_u, ovo, why, tan);
   }
+  // TJIC success; operate on gon
   else {
-    u2_noun vir = u2k(u2h(u2t(gon)));
-    u2_noun cor = u2k(u2t(u2t(gon)));
+    u2_noun vir = u2k(u2h(u2t(gon)));  // TJIC  vir = side effects  // c3_hear packets  "I want to hear that again"
+    u2_noun cor = u2k(u2t(u2t(gon)));  // TJIC  cor = new rock (new value of system)
     u2_noun nug;
 
     u2z(gon);
-    nug = u2_reck_nick(rec_u, vir, cor);
+    nug = u2_reck_nick(rec_u, vir, cor);  // <---- TJIC event transformations can happen here
 
     if ( u2_blip != u2h(nug) ) {
       u2_noun why = u2k(u2h(nug));
       u2_noun tan = u2k(u2t(nug));
 
       u2z(nug);
-      _raft_lame(rec_u, ovo, why, tan);
+      _raft_lame(rec_u, ovo, why, tan);  // <---- TJIC event transformations can happen here
     }
     else {
       vir = u2k(u2h(u2t(nug)));
       cor = u2k(u2t(u2t(nug)));
 
       u2z(nug);
-      _raft_sure(rec_u, ovo, vir, cor);
+      _raft_sure_guard(rec_u, ovo, vir, cor, c3_false);
     }
   }
   //  uL(fprintf(uH, "punk oot %s\n", txt_c));
@@ -1621,13 +1640,15 @@ _raft_comm(u2_reck* rec_u, c3_d bid_d)
   egg_u = rec_u->ova.egg_u;
   while ( egg_u ) {
     if ( egg_u->ent_d <= bid_d ) {
-      egg_u->cit = u2_yes;
+      egg_u->log = u2_yes;
     } else break;
     egg_u = egg_u->nex_u;
   }
   u2_lo_shut(u2_yes);
 }
 
+// When we send something to raft w _raft_push(), we ask libuv to call us back later.
+// This is later.
 static void
 _raft_comm_cb(uv_timer_t* tim_u, c3_i sas_i)
 {
@@ -1636,29 +1657,8 @@ _raft_comm_cb(uv_timer_t* tim_u, c3_i sas_i)
   _raft_comm(u2A, raf_u->ent_d);
 }
 
-static c3_d
-_raft_push(u2_raft* raf_u, c3_w* bob_w, c3_w len_w)
-{
-  c3_assert(raf_u->typ_e == u2_raty_lead);
-  c3_assert(0 != bob_w && 0 < len_w);
 
-  if ( 1 == raf_u->pop_w ) {
-    c3_assert(u2_raty_lead == raf_u->typ_e);
-    raf_u->ent_d = u2_sist_pack(u2A, raf_u->tem_w, c3__ov, bob_w, len_w);
-    raf_u->lat_w = raf_u->tem_w;  //  XX
 
-    if ( !uv_is_active((uv_handle_t*)&raf_u->tim_u) ) {
-      uv_timer_start(&raf_u->tim_u, _raft_comm_cb, 0, 0);
-    }
-
-    return raf_u->ent_d;
-  }
-  else {
-    //  TODO
-    uL(fprintf(uH, "raft: multi-instance push\n"));
-    c3_assert(0);
-  }
-}
 
 /* _raft_kick_all(): kick a list of events, transferring.
 */
@@ -1673,6 +1673,8 @@ _raft_kick_all(u2_reck* rec_u, u2_noun vir)
     u2_reck_kick(rec_u, ovo);
   }
 }
+
+
 
 /* u2_raft_work(): work in rec_u.
 */
@@ -1696,9 +1698,10 @@ u2_raft_work(u2_reck* rec_u)
     //  Delete finished events.
     //
     while ( rec_u->ova.egg_u ) {
+
       egg_u = rec_u->ova.egg_u;
 
-      if ( u2_yes == egg_u->did ) {
+      if ( u2_yes == egg_u->done ) {
         vir = egg_u->vir;
 
         if ( egg_u == rec_u->ova.geg_u ) {
@@ -1710,7 +1713,7 @@ u2_raft_work(u2_reck* rec_u)
           rec_u->ova.egg_u = egg_u->nex_u;
         }
 
-        egg_u->cit = u2_yes;
+        egg_u->log = u2_yes;
         free(egg_u);
       }
       else break;
@@ -1722,11 +1725,11 @@ u2_raft_work(u2_reck* rec_u)
       if ( 0 == u2R->lug_u.len_d ) {
         return;
       }
-      ova = u2_ckb_flop(rec_u->roe);
+      ova = u2_ckb_flop(rec_u->roe);     /// call multiple things off queue and punk them to arvo
       rec_u->roe = u2_nul;
 
       while ( u2_nul != ova ) {
-        _raft_punk(rec_u, u2k(u2t(u2h(ova))));
+        _raft_punk(rec_u, u2k(u2t(u2h(ova))));   // arvo has got it ; side effects are queued up SOMEWHERE
         c3_assert(u2_nul == u2h(u2h(ova)));
 
         nex = u2k(u2t(ova));
@@ -1734,13 +1737,11 @@ u2_raft_work(u2_reck* rec_u)
       }
     }
 
-    //  Cartify, jam, and encrypt this batch of events. Take a number, Raft will
-    //  be with you shortly.
+    //  Cartify, jam, encrypt, log this batch of events. 
+    //
     {
       c3_d    bid_d;
-      c3_w    len_w;
-      c3_w*   bob_w;
-      u2_noun ron;
+
       u2_noun ovo;
 
       ova = u2_ckb_flop(rec_u->roe);
@@ -1753,24 +1754,28 @@ u2_raft_work(u2_reck* rec_u)
         u2z(ova); ova = nex;
 
         if ( u2_nul != ovo ) {
+
+          // we're making a new egg here, that's LIKE ovo
+          //
           egg_u = c3_malloc(sizeof(*egg_u));
           egg_u->nex_u = 0;
-          egg_u->cit = u2_no;
-          egg_u->did = u2_no;
+          egg_u->log = u2_no;
+          egg_u->done = u2_no;
           egg_u->vir = vir;
 
-          ron = u2_cke_jam(u2nc(u2k(rec_u->now), ovo));
-          c3_assert(rec_u->key);
-          ron = u2_dc("en:crua", u2k(rec_u->key), ron);
+          if(u2_Host.ops_u.kaf_c){
+            bid_d = u2_kafk_push_ova(rec_u, ovo, LOG_MSG_PRECOMMIT);  
+          } else {
+            bid_d = u2_egz_push_ova(rec_u, ovo, LOG_MSG_PRECOMMIT);
+          }
 
-          len_w = u2_cr_met(5, ron);
-          bob_w = c3_malloc(len_w * 4L);
-          u2_cr_words(0, len_w, bob_w, ron);
-          u2z(ron);
-
-          bid_d = _raft_push(u2R, bob_w, len_w);
+          // ...and  here we're putting the log ID # in it
+          // but why?
+          //
           egg_u->ent_d = bid_d;
 
+          // then we enqueu this NEW egg
+          // again...why?
           if ( 0 == rec_u->ova.geg_u ) {
             c3_assert(0 == rec_u->ova.egg_u);
             rec_u->ova.geg_u = rec_u->ova.egg_u = egg_u;
@@ -1781,9 +1786,31 @@ u2_raft_work(u2_reck* rec_u)
             rec_u->ova.geg_u = egg_u;
           }
           _raft_kick_all(rec_u, vir);
-          egg_u->did = u2_yes;
+          egg_u->done = u2_yes;
         }
       }
     }
   }
 }
+
+//  This is the final step of some tricky coordination.
+//
+//  We must (a) log each ova, (b) process each ova.  We may do those things in parallel, but 
+//  both must be done before we can update the global state and emit side effects.
+//
+//  _raft_sure is that final step.  
+//
+//  This function guards _raft_sure.  Either you are ready to call raft_sure right now, 
+//
+//  force_delay
+static void 
+_raft_sure_guard(u2_reck* rec_u, u2_noun ovo, u2_noun vir, u2_noun cor, c3_t force_delay)
+{
+  //  if ( ( rec_u->ova.egg_u->log) && (rec_u->ova.egg_u->done) && force_delay  ) {
+    _raft_sure(rec_u, ovo, vir, cor);
+    //  } else {
+    // NOTFORCHECKIN - here we have to enqueue a task for later
+    //  }
+}
+
+

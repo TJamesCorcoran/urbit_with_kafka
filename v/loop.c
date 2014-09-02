@@ -23,6 +23,8 @@
 
 #include "all.h"
 #include "v/vere.h"
+#include "v/egzh.h"
+#include "v/kafk.h"
 
 static jmp_buf Signal_buf;
 #ifndef SIGSTKSZ
@@ -158,7 +160,7 @@ u2_loop_signal_memory()
 
 /* _lo_init(): initialize I/O across the process.
 */
-static void
+void
 _lo_init()
 {
   u2_unix_io_init();
@@ -647,12 +649,24 @@ u2_lo_loop()
   signal(SIGPIPE, SIG_IGN);     //  pipe, schmipe
   // signal(SIGIO, SIG_IGN);    //  linux is wont to produce for some reason
 
+  // set up libuv watchers
   _lo_init();
+
+  // set up arvo processing (timeout clock, etc.)
   u2_raft_init();
 
+  // set up logging
+  if(u2_Host.ops_u.kaf_c){
+    u2_kafk_init();
+  } else {
+    u2_egz_init();
+  }
+
+  // head into event loop
   if ( u2_no == u2_Host.ops_u.bat ) {
     uv_run(u2L, UV_RUN_DEFAULT);
   }
+
 }
 
 /* u2_lo_lead(): actions on promotion to leader.

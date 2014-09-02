@@ -20,6 +20,9 @@
 #include "all.h"
 #include "f/coal.h"
 #include "v/vere.h"
+#include "v/egzh.h"
+#include "v/kafk.h"
+#include "v/sist.h"
 
 /* _reck_mung(): formula wrapper with gate and sample.
 */
@@ -64,7 +67,7 @@ u2_reck_nick(u2_reck* rec_u, u2_noun vir, u2_noun cor)
 
     if ( (u2_yes == u2_cr_cell((i_vir=u2h(vir)), &pi_vir, &qi_vir)) &&
          (u2_yes == u2du(qi_vir)) &&
-         (c3__hear == u2h(qi_vir)) )
+         (c3__hear == u2h(qi_vir)) )  /// TJIC: events that I want to hear again
     {
       u2_noun gon;
 
@@ -316,12 +319,8 @@ u2_reck_cold(u2_reck* rec_u, c3_w kno_w)
     u2_noun pot, eng;
     c3_c    ful_c[2048];
 
-    if ( u2_yes == u2_Host.ops_u.nuu ) {
-      snprintf(ful_c, 2048, "%s/urbit.pill", U2_LIB);
-    } else {
-      snprintf(ful_c, 2048, "%s/.urb/urbit.pill", u2_Host.cpu_c);
-    }
-    printf("loading %s\n", ful_c);
+    u2_sist_get_pill_filestr(ful_c, 2048);
+    printf("reck: loading %s\n", ful_c);
 
     if ( 0 == (pot = u2_walk_load(ful_c)) ) {
       perror(ful_c);
@@ -523,7 +522,7 @@ _reck_kick_sync(u2_reck* rec_u, u2_noun pox, u2_noun fav)
 static u2_bean
 _reck_kick_newt(u2_reck* rec_u, u2_noun pox, u2_noun fav)
 {
-  u2_noun p_fav;
+  // u2_noun p_fav;
 
   switch ( u2h(fav) ) {
     default: break;

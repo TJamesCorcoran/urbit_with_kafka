@@ -25,6 +25,8 @@
 #define C3_GLOBAL
 #include "all.h"
 #include "v/vere.h"
+#include "v/kafk.h"
+
 
 /**  Legacy fixed jet linkage.  Destroy me please.
 **/
@@ -74,9 +76,19 @@ _main_getopt(c3_i argc, c3_c** argv)
   u2_Host.ops_u.nuu = u2_no;
   u2_Host.ops_u.mem = u2_no;
   u2_Host.ops_u.kno_w = DefaultKernel;
+  u2_Host.ops_u.kaf_c = (c3_c*) NULL;
 
-  while ( (ch_i = getopt(argc, argv, "I:X:f:k:l:n:p:r:LabcdgqvFM")) != -1 ) {
+  while ( (ch_i = getopt(argc, argv, "I:A:K:X:f:k:l:n:p:r:LabcdgqvFM")) != -1 ) {
     switch ( ch_i ) {
+      case 'A': {
+        u2_Host.ops_u.adm_c = strdup(optarg);
+        if ((strcmp(optarg, "ltok") != 0) && (strcmp(optarg, "ktol"))) {
+          fprintf(stderr, "illegal -A subcommand: %s\n",  optarg);
+          return u2_no;
+
+        }
+        break;
+      }
       case 'M': {
         u2_Host.ops_u.mem = u2_yes;
         break;
@@ -129,6 +141,11 @@ _main_getopt(c3_i argc, c3_c** argv)
         u2_Host.ops_u.fak = u2_yes;
         break;
       }
+      case 'K': {
+        u2_Host.ops_u.kaf_c  = strdup(optarg);
+        break;
+      }
+
       case 'a': { u2_Host.ops_u.abo = u2_yes; break; }
       case 'b': { u2_Host.ops_u.bat = u2_yes; break; }
       case 'c': { u2_Host.ops_u.nuu = u2_yes; break; }
@@ -166,20 +183,23 @@ _main_getopt(c3_i argc, c3_c** argv)
     }
   }
 
+  // N.B. this used to be something like 'mypier', which specified computer name
+  // As of July 2014, computer name = ship name = name of directory in ~/urb where pier lives
+  //
+  // find shipname
+  //
   if ( argc != (optind + 1) ) {
-    return u2_no;
-  } else {
-    {
-      c3_c* ash_c;
-
-      if ( (ash_c = strrchr(argv[optind], '/')) && (ash_c[1] == 0) ) {
-        *ash_c = 0;
-      }
-    }
-
-    u2_Host.cpu_c = strdup(argv[optind]);
-    return u2_yes;
+    fprintf(stderr, "You must specify your ship name on the command line.\n");
+    exit(1);
+  } 
+  if (argv[optind][0] != '~'){
+    fprintf(stderr, "You must specify your ship name (not pier). Names begin with '~'.\n");
+    exit(1);
   }
+
+  u2_Host.cpu_c = strdup(argv[optind]);
+  return u2_yes;
+
 }
 
 /* u2_ve_usage(): print usage and exit.
@@ -187,8 +207,29 @@ _main_getopt(c3_i argc, c3_c** argv)
 static void
 u2_ve_usage(c3_i argc, c3_c** argv)
 {
-  fprintf(stderr, "%s: usage: [-v] [-k stage] [-p ames_port] computer\n",
-                  argv[0]);
+  fprintf(stderr, "%s: usage: { options } shipname\n",                  argv[0]);
+  fprintf(stderr, "       [-I emperor ]   // specify emperor e.g. ~zod \n");
+  fprintf(stderr, "       [-K brokerlist] // kafka logging. Specify 1+ brokers e.g. localhost:9092,... \n");
+  fprintf(stderr, "       [-X ]           // skip last event \n");
+  fprintf(stderr, "       [-a ]           // ? \n");
+  fprintf(stderr, "       [-b ]           // batch create \n");
+  fprintf(stderr, "       [-c ]           // create new pier (to be named after ship spec) \n");
+  fprintf(stderr, "       [-d ]           // ? \n");
+  fprintf(stderr, "       [-f ]           // fuzz testing\n");
+  fprintf(stderr, "       [-g ]           // ? \n");
+  fprintf(stderr, "       [-k stage]      // kernel version \n");
+  fprintf(stderr, "       [-l ]           // raft port\n");
+  fprintf(stderr, "       [-n ]           // unix hostname \n");
+  fprintf(stderr, "       [-p ames_port]  // ames port\n");
+  fprintf(stderr, "       [-q ]           // quiet\n");
+  fprintf(stderr, "       [-r host ]      // raft flotilla \n");
+  fprintf(stderr, "       [-v ]           // verbose\n");
+  fprintf(stderr, "       [-F ]           // fake carrier \n");
+  fprintf(stderr, "       [-L ]           // local-only networking \n");
+  fprintf(stderr, "       [-A command ]   // admin tool \n");
+  fprintf(stderr, "                       // * ltok - read log, write it kafka \n");
+  fprintf(stderr, "                       // * ktol - read kafka, write it log \n");
+
   exit(1);
 }
 
@@ -253,6 +294,10 @@ c3_i
 main(c3_i   argc,
      c3_c** argv)
 {
+  // set both logging systems to unit-ed
+  //
+  u2K->inited_t = c3_false;
+
   c3_w kno_w;
 
   _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
@@ -392,7 +437,15 @@ main(c3_i   argc,
 
   u2_lo_grab("main", u2_none);
 
-  u2_lo_loop();
+  // booted in admin mode: do a task, then exit
+  // booted in user mode: do command loop
+  if (u2_Host.ops_u.adm_c != 0){
+    if (strcmp(u2_Host.ops_u.adm_c, "ltok") ==0) { u2_kafka_admin_egz_to_kafka(); }
+    else if (strcmp(u2_Host.ops_u.adm_c, "ktol") ==0) { u2_kafka_admin_kafka_to_egz(); }
+    else  { fprintf(stderr, "unsupported admin mode command %s\n", u2_Host.ops_u.adm_c); exit(1); }
+  } else {
+    u2_lo_loop();
+  }
 
   return 0;
 }

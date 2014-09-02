@@ -20,6 +20,7 @@
 #include "all.h"
 #include "f/coal.h"
 #include "v/vere.h"
+#include "v/sist.h"
 
 /* _unix_down(): descend path.
 */
@@ -952,7 +953,10 @@ _unix_hot_gain(u2_noun who, u2_bean mek)
 {
   u2_noun hox = u2_dc("scot", 'p', u2k(who));
   c3_c*   hox_c = u2_cr_string(hox);
-  c3_c*   pax_c = _unix_down(u2_Host.cpu_c, hox_c + 1);
+
+  c3_c    pax_c[2048];  
+  u2_sist_get_pier_dirstr(pax_c, 2048);
+
   DIR*    rid_u = opendir(pax_c);
 
   if ( !rid_u ) {
@@ -1239,7 +1243,9 @@ _unix_desk_sync_ergo(u2_noun  hox,
 void
 u2_unix_ef_init(u2_noun who)
 {
-  _unix_hot_gain(u2k(who), u2_yes);
+  // c3_c    base_c[2048];
+  // u2_sist_get_doturb_dirstr(base_c, 2048);
+  //  u2_unix_acquire(base_c);
 
   u2_reck_plan(u2A, u2nq(u2_blip, c3__sync, u2k(u2A->sen), u2_nul),
                     u2nq(c3__into, who,
@@ -1373,6 +1379,7 @@ _unix_time_cb(uv_timer_t* tim_u, c3_i sas_i)
 static void
 _unix_sign_cb(uv_signal_t* sil_u, c3_i num_i)
 {
+
   u2_lo_open();
   {
     switch ( num_i ) {
@@ -1468,7 +1475,6 @@ u2_unix_io_init(void)
 void
 u2_unix_io_talk()
 {
-  u2_unix_acquire(u2_Host.cpu_c);
   u2_unix_ef_move();
   uv_check_start(&u2_Host.unx_u.syn_u, _unix_ef_sync);
 }
